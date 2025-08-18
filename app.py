@@ -15,7 +15,7 @@ from modules.ai_categorizer import categorize_transaction
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Microsoft VS Code\tesseract.exe"
 
-
+# hi 
 def extract_text_with_ocr(pdf_bytes):
     """Extract text from image-based PDFs using OCR."""
     images = convert_from_bytes(pdf_bytes)
