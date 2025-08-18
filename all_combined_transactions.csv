@@ -1,0 +1,51 @@
+Date,Time,Merchant,Amount,Status,Transaction ID,UPI ID,Note,Description,Source File,Category,Classification,Credit,Debit
+20-07-2025,21:37:51,Swiggy,2104.5,Success,075f7dc3-21fa-4c17-897e-ae110b52e5a0,jacob82@okaxis,Payment to Swiggy,Swiggy,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,2104.5
+22-04-2025,14:16:29,Amazon,1128.57,Success,2155ca2a-6a46-44c8-a59f-cc7a48bf999d,jacksonloretta@okaxis,Payment to Amazon,Amazon,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,1128.57
+27-04-2025,05:53:53,Electricity Bill,4797.37,Success,54827639-cab3-4579-b706-1edac972fe81,ulittle@okaxis,Payment to Electricity Bill,Electricity Bill,Fake_GooglePay_Transaction_History.pdf,Utilities,Need,0.0,4797.37
+27-07-2025,18:43:15,Amazon,3757.51,Success,a73410a0-8ba0-4a4e-8c2a-e35eb4b30435,irwinbrandy@okaxis,Payment to Amazon,Amazon,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,3757.51
+24-03-2025,11:55:49,Flipkart,1070.54,Success,1e5aae2d-31ed-42ac-9c9d-5aecc96c4a53,suewaters@okaxis,Payment to Flipkart,Flipkart,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,1070.54
+04-03-2025,01:03:40,Uber,1564.32,Success,af7be0cc-e9cc-44a5-b688-d23416fa43c7,dawnbaker@okaxis,Payment to Uber,Uber,Fake_GooglePay_Transaction_History.pdf,Transport,Need,0.0,1564.32
+18-04-2025,14:48:44,Petrol Pump,2592.96,Success,4e90437b-2cb5-4a19-8fba-6d8b3d1cff30,cherylrodriguez@okaxis,Payment to Petrol Pump,Petrol Pump,Fake_GooglePay_Transaction_History.pdf,Transport,Need,0.0,2592.96
+09-07-2025,00:24:33,Water Bill,483.65,Success,a667ffaf-adf6-4fc9-bfd2-5f45b73216b3,robertwilson@okaxis,Payment to Water Bill,Water Bill,Fake_GooglePay_Transaction_History.pdf,Utilities,Need,0.0,483.65
+23-04-2025,09:01:44,BookMyShow,1085.72,Success,9915d49c-b6a3-44a7-93de-0a8974cdf74d,walkerdaniel@okaxis,Payment to BookMyShow,BookMyShow,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,1085.72
+29-07-2025,16:19:01,Petrol Pump,127.35,Success,b7eb5d8b-05c4-4959-ae3e-19a433af9ed8,rhodescameron@okaxis,Payment to Petrol Pump,Petrol Pump,Fake_GooglePay_Transaction_History.pdf,Transport,Need,0.0,127.35
+26-04-2025,18:28:23,Movie Tickets,4522.21,Success,a5d4c003-38df-4133-bf93-15686eba381f,annallen@okaxis,Payment to Movie Tickets,Movie Tickets,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,4522.21
+08-07-2025,03:21:01,Spotify,4129.46,Success,b0bf9e91-2cd0-422e-bffc-073066b5bdf8,benjamin89@okaxis,Payment to Spotify,Spotify,Fake_GooglePay_Transaction_History.pdf,Subscriptions,Want,0.0,4129.46
+14-06-2025,13:53:30,MakeMyTrip,3213.77,Success,55844283-39fc-43dd-883f-9cd034f1d47f,ogamble@okaxis,Payment to MakeMyTrip,MakeMyTrip,Fake_GooglePay_Transaction_History.pdf,Transport,Want,0.0,3213.77
+23-04-2025,06:13:23,Amazon,59.82,Success,ef34efbc-8690-4d78-9c6a-d13e6cb5493b,soniahoward@okaxis,Payment to Amazon,Amazon,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,59.82
+06-07-2025,23:30:41,YouTube Premium,4405.6,Success,397bc399-c8d7-4e02-9668-cd173d3281db,emily69@okaxis,Payment to YouTube Premium,YouTube Premium,Fake_GooglePay_Transaction_History.pdf,Subscriptions,Want,0.0,4405.6
+10-03-2025,09:20:01,Reliance Fresh,3758.64,Success,30d42bda-7b10-4e2f-8c04-f65d732f6d6b,jesus84@okaxis,Payment to Reliance Fresh,Reliance Fresh,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,3758.64
+27-02-2025,09:53:24,Airtel Recharge,3246.14,Success,58d2cd81-bd50-4a73-b920-95d228277f6e,brandon42@okaxis,Payment to Airtel Recharge,Airtel Recharge,Fake_GooglePay_Transaction_History.pdf,Utilities,Need,0.0,3246.14
+15-07-2025,03:11:44,BookMyShow,1050.69,Success,4a4013d6-4a07-4c37-935e-89ea8cbf53cc,shawmorgan@okaxis,Payment to BookMyShow,BookMyShow,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,1050.69
+29-07-2025,08:48:01,Zomato,2420.0,Success,bc8d591f-55ba-41cb-8c53-7e3ddb3858d1,colin13@okaxis,Payment to Zomato,Zomato,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,2420.0
+16-03-2025,01:25:19,Google Play,3713.85,Success,1a977a9d-8c06-4f76-b491-d90b4309d814,yblevins@okaxis,Payment to Google Play,Google Play,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,3713.85
+11-06-2025,21:37:44,Water Bill,1695.69,Success,97b1f8b7-9bd1-43a7-9563-2f87cd138a6a,piercecatherine@okaxis,Payment to Water Bill,Water Bill,Fake_GooglePay_Transaction_History.pdf,Utilities,Need,0.0,1695.69
+23-03-2025,02:53:47,Local Kirana,4309.08,Success,5509dabe-f62c-4107-99d9-d7d6f2c58800,lori26@okaxis,Payment to Local Kirana,Local Kirana,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,4309.08
+15-04-2025,01:32:37,Reliance Fresh,3091.45,Success,039c99f7-21a2-4dae-9d96-df1241b44428,ihardin@okaxis,Payment to Reliance Fresh,Reliance Fresh,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,3091.45
+23-04-2025,10:02:08,Google Play,440.4,Success,3d2bb38f-6e20-4b6f-9502-b98cc7660456,brasmussen@okaxis,Payment to Google Play,Google Play,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,440.4
+25-03-2025,07:29:45,Zomato,2266.39,Success,70f3b87c-246a-4e3f-a3fa-a8ac02241c96,davidpennington@okaxis,Payment to Zomato,Zomato,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,2266.39
+19-04-2025,06:20:36,Myntra,2131.59,Success,b9b33a98-eabf-4075-bee2-33fe7879e326,tpearson@okaxis,Payment to Myntra,Myntra,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,2131.59
+07-07-2025,08:44:03,Flipkart,1298.06,Success,ba4418eb-f6ac-47dd-9003-8f9dfa13a67e,debbie26@okaxis,Payment to Flipkart,Flipkart,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,1298.06
+16-03-2025,13:01:21,Google Play,3942.45,Success,a6e4f3db-297b-4d11-8c93-5f79879a0173,abigailwalker@okaxis,Payment to Google Play,Google Play,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,3942.45
+31-07-2025,22:36:31,Amazon,1948.71,Success,93595139-e863-48b6-97f4-0bdcf359f6a4,cstevens@okaxis,Payment to Amazon,Amazon,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,1948.71
+12-03-2025,12:02:47,Zomato,207.94,Success,1bc7627a-47f4-4176-befa-663ac26eb85d,herringanthony@okaxis,Payment to Zomato,Zomato,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,207.94
+10-07-2025,16:14:20,Spotify,386.42,Success,8fdf465c-2ace-43fb-9925-e80db4bf48dc,simontodd@okaxis,Payment to Spotify,Spotify,Fake_GooglePay_Transaction_History.pdf,Subscriptions,Want,0.0,386.42
+07-07-2025,06:49:50,YouTube Premium,3011.68,Success,4014cd27-9440-43fa-8c91-bf92b265a838,tgibson@okaxis,Payment to YouTube Premium,YouTube Premium,Fake_GooglePay_Transaction_History.pdf,Subscriptions,Want,0.0,3011.68
+06-04-2025,17:29:50,Reliance Fresh,204.6,Success,aac08b47-e071-49c0-a0fd-6b5c618d41a2,bradley24@okaxis,Payment to Reliance Fresh,Reliance Fresh,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,204.6
+04-06-2025,14:03:59,Local Kirana,733.11,Success,a4b40391-db0a-4f7c-878b-c403ce95e1ec,erivers@okaxis,Payment to Local Kirana,Local Kirana,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,733.11
+27-03-2025,00:50:08,McDonald's,1245.31,Success,e8457dfe-3e8b-4bb0-9469-df657bfb9d81,judy96@okaxis,Payment to McDonald's,McDonald's,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,1245.31
+21-04-2025,09:32:30,YouTube Premium,3004.1,Success,0d79ce00-c3ea-4c3e-85c1-a0a075647f3a,cindywoodward@okaxis,Payment to YouTube Premium,YouTube Premium,Fake_GooglePay_Transaction_History.pdf,Subscriptions,Want,0.0,3004.1
+07-05-2025,22:03:49,Netflix,4271.78,Success,27903dbe-310a-4224-9cbb-e44ff6ac696a,shahsean@okaxis,Payment to Netflix,Netflix,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,4271.78
+15-02-2025,12:05:25,Swiggy,219.37,Success,281f960f-80e4-4661-99c3-d3b54757324f,lisa63@okaxis,Payment to Swiggy,Swiggy,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,219.37
+08-06-2025,08:08:43,Reliance Fresh,407.01,Success,ec253f3a-0699-4949-a218-c27277e45d79,jbrown@okaxis,Payment to Reliance Fresh,Reliance Fresh,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,407.01
+24-03-2025,15:57:48,Domino's,1359.5,Success,fd2b12af-4f2d-49ba-b724-b23217365a50,cwatkins@okaxis,Payment to Domino's,Domino's,Fake_GooglePay_Transaction_History.pdf,Food & Dining,Want,0.0,1359.5
+01-06-2025,17:04:27,Movie Tickets,4363.72,Success,d8b10ab3-54c9-42e5-8430-96ac3b5c08ca,andrewbutler@okaxis,Payment to Movie Tickets,Movie Tickets,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,4363.72
+25-03-2025,12:36:00,Phone Recharge,335.76,Success,af5202d6-b92a-4098-acd8-358a5de1c2df,johnsontravis@okaxis,Payment to Phone Recharge,Phone Recharge,Fake_GooglePay_Transaction_History.pdf,Utilities,Need,0.0,335.76
+23-03-2025,06:39:21,Local Kirana,4296.8,Success,2972f8ba-9051-4922-80ae-3a377235fa04,anthonywright@okaxis,Payment to Local Kirana,Local Kirana,Fake_GooglePay_Transaction_History.pdf,Groceries,Need,0.0,4296.8
+06-05-2025,05:31:05,Myntra,2489.89,Success,7d055259-7441-4795-91cd-f044cc43e8fc,thomasmartinez@okaxis,Payment to Myntra,Myntra,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,2489.89
+24-07-2025,12:42:17,Ola,4407.89,Success,04bbf31e-616f-490c-9cf5-852213e73465,stephanie90@okaxis,Payment to Ola,Ola,Fake_GooglePay_Transaction_History.pdf,Transport,Need,0.0,4407.89
+05-07-2025,02:33:58,Netflix,3037.35,Success,0c904939-e8b3-4b64-8faa-33ed44fc36ce,gabrielpierce@okaxis,Payment to Netflix,Netflix,Fake_GooglePay_Transaction_History.pdf,Entertainment,Want,0.0,3037.35
+27-04-2025,06:36:06,Petrol Pump,949.19,Success,1d1c6448-ff99-4575-973c-b9509f94c729,nli@okaxis,Payment to Petrol Pump,Petrol Pump,Fake_GooglePay_Transaction_History.pdf,Transport,Need,0.0,949.19
+18-05-2025,07:31:05,Flipkart,1800.97,Success,f0d6fc82-a24c-43b7-8294-39aca72a5cc0,breanna39@okaxis,Payment to Flipkart,Flipkart,Fake_GooglePay_Transaction_History.pdf,Shopping,Want,0.0,1800.97
+13-03-2025,16:07:43,Ola,800.65,Success,0778d722-9265-470a-ab6a-03a5cc1104a1,alan78@okaxis,Payment to Ola,Ola,Fake_GooglePay_Transaction_History.pdf,Transport,Need,0.0,800.65
+12-04-2025,06:08:39,Phone Recharge,1430.49,Success,19d48249-5ca1-4f94-abb0-d3f8b5dfd88b,smithdanny@okaxis,Payment to Phone Recharge,Phone Recharge,Fake_GooglePay_Transaction_History.pdf,Utilities,Need,0.0,1430.49
