@@ -71,7 +71,7 @@ streamlit run app.py
 |-----------------|---------------------------|
 | ![Dashboard Screenshot](docs/dashboard.png) | ![Chatbot Screenshot](docs/chatbot.png) |
 
-| Upload Section | Category Insights |
+| Visual Section | Expense Insights |
 |----------------|-------------------|
 | ![Visual Analysis Screenshot](docs/visual_analysis.png) | ![Expense Insight Screenshot](docs/Expense_Insight.png) |
 
