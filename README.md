@@ -99,4 +99,4 @@ If you’d like to improve **FinSight**:
 **👩‍💻 Dilnaz Grewal**  
 > Passionate about building intelligent systems that combine **data science** and **web development** to create impactful real-world solutions.
 
-📫 Connect on [LinkedIn]([https://linkedin.com](https://www.linkedin.com/in/dilnazgrewal05/)) • [GitHub](https://github.com/dilnazgrewal)
+📫 Connect on [LinkedIn](https://www.linkedin.com/in/dilnazgrewal05/) • [GitHub](https://github.com/dilnazgrewal)
