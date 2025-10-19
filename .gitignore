@@ -1,0 +1,50 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Streamlit
+.streamlit/
+
+# Environment variables and secrets (API keys, etc.)
+.env
+*.env
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+
+# Reports, generated PDFs, or export folders
+reports/
+output/
+*.pdf
+
+# Cache or session data
+cache/
+__cache__/
+temp/
+tmp/
+
+# Any uploaded files folder (optional)
+uploads/
+
+# If using Streamlit Cloud or similar deployment
+.streamlit/secrets.toml
