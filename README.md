@@ -63,6 +63,19 @@ cd finsight
 pip install -r requirements.txt
 streamlit run app.py
 ```
+---
+
+## 📸 Screenshots
+
+| Dashboard View | Chatbot with Speech Input |
+|-----------------|---------------------------|
+| ![Dashboard Screenshot](docs/dashboard.png) | ![Chatbot Screenshot](docs/chatbot.png) |
+
+| Upload Section | Category Insights |
+|----------------|-------------------|
+| ![Visual Analysis Screenshot](docs/visual_analysis.png) | ![Expense Insight Screenshot](docs/Expense_Insight.png) |
+
+---
 
 ## 🧾 Usage
 
