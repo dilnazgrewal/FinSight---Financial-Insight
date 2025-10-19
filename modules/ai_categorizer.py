@@ -1,84 +1,170 @@
 import os
 import json
+import time
+import hashlib
+import pandas as pd
+import streamlit as st
 from dotenv import load_dotenv
 import google.generativeai as genai
-from fuzzywuzzy import fuzz
 
-# Load environment variable
 load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    st.error("⚠️ GOOGLE_API_KEY not found in .env file")
+else:
+    genai.configure(api_key=api_key)
 
-category_keywords = {
-    "Shopping": ["amazon", "flipkart", "myntra", "ajio", "meesho"],
-    "Food": ["swiggy", "zomato", "dominos", "kfc", "mcdonald", "pizza", "blinkit", "bigbasket"],
-    "Fuel": ["petrol", "diesel", "fuel", "indianoil", "bharat petroleum", "hpcl"],
-    "Bills": ["electricity", "water bill", "gas bill", "broadband", "wifi", "internet", "mobile recharge"],
-    "Travel": ["ola", "uber", "irctc", "makemytrip", "airlines", "bus ticket"],
-    "Entertainment": ["netflix", "prime video", "spotify", "hotstar", "sonyliv"],
-}
+CACHE_FILE = "ai_cache.json"
 
-def categorize_transaction(desc):
-    for category, keywords in category_keywords.items():
-        for kw in keywords:
-            if fuzz.partial_ratio(desc, kw) > 80:
-                return category
-    return "Miscellaneous"
+def _load_cache():
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
 
-def categorize_transactions_batch(transactions):
-    """
-    Takes a list of transaction descriptions and returns a list of dicts
-    with Category and Classification.
-    """
-    # Clean transactions: ensure all are strings, strip extra spaces
-    transactions = [str(t).strip() if t else "" for t in transactions]
+def _save_cache(cache):
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
 
-    # If no valid transactions, return empty categories
-    if not any(transactions):
-        return [{"Category": "Uncategorized", "Classification": None} for _ in transactions]
+AI_CACHE = _load_cache()
+
+
+def preprocess_description(desc: str) -> str:
+    """Clean and normalize the description before sending to AI."""
+    desc = str(desc or "").lower().strip()
+    for phrase in [
+        "paid to", "received from", "transaction id", "utr no.",
+        "paid by", "credited to", "debited from", "via upi"
+    ]:
+        desc = desc.replace(phrase, "")
+    return desc.strip()
+
+
+def _categorize_with_gemini(descriptions: list, debug=False, retries=2):
+    """Send a batch of descriptions to Gemini for categorization."""
+    if not descriptions:
+        return []
+
+    # Remove duplicates by cache lookup
+    results = []
+    to_query = []
+    for desc in descriptions:
+        key = hashlib.md5(desc.encode()).hexdigest()
+        if key in AI_CACHE:
+            results.append(AI_CACHE[key])
+        else:
+            results.append(None)
+            to_query.append(desc)
+
+    if not to_query:
+        return results  # all from cache
 
     prompt = f"""
-You are a financial transaction categorizer.
-For each transaction description below, respond with a JSON array.
-Each element should have:
-- "Category": One of [Food & Dining, Groceries, Transport, Shopping, Subscriptions, Utilities, Rent, Entertainment, Medical, Miscellaneous]
-- "Classification": "Need" or "Want"
+    You are a finance categorization assistant.
+    Assign each transaction a single best-fitting "Category" 
+    from this list:
+    [Food & Dining, Groceries, Transport, Shopping, Subscriptions, Utilities,
+    Rent, Entertainment, Medical, Education, Bank & UPI Transfers, Investments,
+    Bank Charges, Interest/Dividends, Miscellaneous].
 
-Example Output:
-[
-    {{"Category": "Food & Dining", "Classification": "Want"}},
-    {{"Category": "Transport", "Classification": "Need"}}
-]
+    Respond ONLY with a JSON array of objects, where each object has a single "Category" key.
+    For example: [{{"Category": "Food & Dining"}}, {{"Category": "Shopping"}}]
 
-Transactions:
-{chr(10).join([f"- {t}" for t in transactions])}
-"""
+    Transactions: {json.dumps(to_query, ensure_ascii=False)}
+    """
 
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
-        # Extract text safely
-        ai_text = response.text.strip() if hasattr(response, "text") else ""
+    for attempt in range(retries):
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": 0.0,
+                    "response_mime_type": "application/json"
+                },
+            )
+
+            if debug:
+                st.write("🔍 Raw AI response:", response.text)
+
+            batch_results = json.loads(response.text)
+
+            if isinstance(batch_results, list) and len(batch_results) == len(to_query):
+                # Save new results to cache
+                for desc, res in zip(to_query, batch_results):
+                    key = hashlib.md5(desc.encode()).hexdigest()
+                    AI_CACHE[key] = res
+                _save_cache(AI_CACHE)
+                return batch_results
+
+        except Exception as e:
+            if debug:
+                st.warning(f"Attempt {attempt + 1} failed: {e}")
+            if "quota" in str(e).lower():
+                st.error("🚨 Gemini quota reached. Using defaults for this batch.")
+                return [{"Category": "Miscellaneous", "Classification": "Other"} for _ in to_query]
+            time.sleep(2)
+
+    return [{"Category": "Miscellaneous", "Classification": "Other"} for _ in to_query]
+
+
+def categorize_transactions_with_ai(df: pd.DataFrame, debug=False):
+    """Categorize only rows that are unclassified or marked as Other/Miscellaneous."""
+    if df.empty or "Description" not in df.columns:
+        return df
+
+    # Clean text
+    df["Cleaned_Description"] = df["Description"].astype(str).apply(preprocess_description)
+
+    # Find rows that need AI help
+    to_fix = df[
+        df["Category"].isna() |
+        df["Category"].isin(["Other", "Miscellaneous"])
+    ].copy()
+
+    if to_fix.empty:
+        if debug:
+            st.info("✅ All transactions already categorized — skipping Gemini.")
+        return df
+
+    descriptions = to_fix["Cleaned_Description"].tolist()
+
+    BATCH_SIZE = 15
+    progress = st.progress(0)
+
+    for i in range(0, len(descriptions), BATCH_SIZE):
+        batch = descriptions[i:i + BATCH_SIZE]
+        indices = list(to_fix.index[i:i + len(batch)])
+
+        batch_results = _categorize_with_gemini(batch, debug=debug)
+
+        if not isinstance(batch_results, list):
+            batch_results = []
+
+        while len(batch_results) < len(batch):
+            batch_results.append({"Category": "Miscellaneous", "Classification": "Other"})
+
+        for idx, result in zip(indices, batch_results):
+            df.at[idx, "Category"] = result.get("Category", "Miscellaneous")
+            df.at[idx, "Classification"] = result.get("Classification", "Other")
+
+        # Add the st.write debug line inside the loop
+        for idx, result in zip(indices, batch_results):
+            st.write(f"🐛 DEBUG: Index={idx}, Result='{result}', Type={type(result)}") 
         
-        # Try to locate JSON inside response
-        if "```" in ai_text:
-            ai_text = ai_text.split("```")[1].replace("json", "").strip()
+            if isinstance(result, dict):
+                # This handles the case where the result is a dictionary as expected
+                df.at[idx, "Category"] = result.get("Category", "Miscellaneous")
+                df.at[idx, "Classification"] = result.get("Classification", "Other")
+            elif isinstance(result, str):
+                # This handles the case where the result is just a string
+                df.at[idx, "Category"] = result
+                df.at[idx, "Classification"] = "Other" # Assign a default classification
 
-        results = json.loads(ai_text)
+        progress.progress((i + len(batch)) / len(descriptions))
 
-        # Validate output structure
-        if isinstance(results, list) and all(isinstance(x, dict) for x in results):
-            # Ensure output length matches input length
-            if len(results) != len(transactions):
-                results = results[:len(transactions)] + [
-                    {"Category": "Uncategorized", "Classification": None}
-                    for _ in range(len(transactions) - len(results))
-                ]
-            return results
-        else:
-            raise ValueError("Unexpected output format")
-
-    except Exception as e:
-        print("Error parsing AI output:", e)
-        # Fallback: return "Uncategorized" for all
-        return [{"Category": "Uncategorized", "Classification": None} for _ in transactions]
+    return df

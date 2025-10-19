@@ -1,468 +1,489 @@
-import fitz  # PyMuPDF
 import streamlit as st
 import pandas as pd
+import time
+import html
+import speech_recognition as sr
+from datetime import datetime
+import google.generativeai as genai
+from dotenv import load_dotenv
+import matplotlib.pyplot as plt
+import fitz
+import re
+import speech_recognition as sr
+from streamlit_mic_recorder import mic_recorder
+from streamlit_mic_recorder import speech_to_text
+from modules.chatbot_agent import answer_query
+from modules.parsers import parse_pdf
 from modules.detect_format import detect_pdf_type
-from modules.parse_upi import parse_upi_text
-from modules.parse_bank import parse_bank_text
-import pytesseract
-from pdf2image import convert_from_bytes
-from PIL import Image
-from modules.ai_categorizer import categorize_transactions_batch  # Batch version
-import plotly.express as px
-import numpy as np
-from langchain.schema import SystemMessage
-from modules.ai_categorizer import categorize_transaction  
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Microsoft VS Code\tesseract.exe"
-
-# hi 
-def extract_text_with_ocr(pdf_bytes):
-    """Extract text from image-based PDFs using OCR."""
-    images = convert_from_bytes(pdf_bytes)
-    text_pages = []
-    for img in images:
-        text = pytesseract.image_to_string(img)
-        text_pages.append(text)
-    return "\n".join(text_pages)
-
-RULE_KEYWORDS = {
-    "Transport": ["fuel", "petrol", "diesel", "petrol pump", "fuel purchase", "uber", "ola", "cab", "taxi", "uber ride", "ola ride"],
-    "Utilities": ["electricity", "electricity bill", "water bill", "phone recharge", "recharge", "bill payment", "gas bill"],
-    "Subscriptions": ["netflix", "spotify", "youtube premium", "prime video", "google play", "play store", "amazon prime", "disney","subscriptions"],
-    "Food & Dining": ["zomato", "swiggy", "mcdonald", "domino", "domino's", "pizza", "restaurant", "kfc"],
-    "Groceries": ["bigbasket", "reliance fresh", "local kirana", "grocery", "dmart"],
-    "Shopping": ["amazon", "flipkart", "myntra", "online shopping", "pos purchase"],
-    "Entertainment": ["bookmyshow", "movie", "movie tickets"],
-    "Medical": ["clinic", "pharmacy", "hospital", "medicine"],
-}
-
-def apply_rule_based_override(description, model_cat, model_class):
-    desc = (str(description) if description is not None else "").lower()
-    for cat, kwlist in RULE_KEYWORDS.items():
-        for kw in kwlist:
-            if kw in desc:
-                classification = "Need" if cat in ["Groceries", "Utilities", "Transport", "Rent", "Medical"] else "Want"
-                return {"Category": cat, "Classification": classification}
-    if isinstance(model_cat, str) and model_cat.strip():
-        return {"Category": model_cat, "Classification": (model_class if model_class and str(model_class).strip() else "Want")}
-    return {"Category": "Miscellaneous", "Classification": "Want"}
-
-
-st.set_page_config(page_title="Project Balance", layout="wide")
-st.title("📄 Project Balance - Upload All Your PDFs")
-
-# --- Init session state ---
-if "final_df" not in st.session_state:
-    st.session_state.final_df = pd.DataFrame()
-
-if "pdfs_parsed" not in st.session_state:
-    st.session_state.pdfs_parsed = False
-
-# --- PDF Upload ---
-uploaded_files = st.file_uploader(
-    "Upload Bank + UPI PDFs (GPay, PhonePe, Paytm, etc.)",
-    type="pdf",
-    accept_multiple_files=True
+from modules.data_handler import clean_transactions_dataframe
+from modules.charts import (
+    plot_expense_by_category, plot_need_vs_want,
+    plot_top_expenses, plot_monthly_trends
 )
+from modules.misc_analyzer import refine_miscellaneous_transactions
+from modules.insights import compute_financial_metrics
+from modules.ai_insights import generate_financial_summary
+from modules.report_generator import create_report
+from modules.ai_categorizer import categorize_transactions_with_ai
+from modules.misc_analyzer import refine_miscellaneous_transactions, refine_bank_transfers
 
-if uploaded_files and not st.session_state.pdfs_parsed:
-    all_dfs = []
+st.set_page_config(page_title="FinSight", layout="wide")
+st.title("💸 FinSight- Financial Insight")
+st.write("Understand. Analyze. Optimize your spending.")
 
-    for file in uploaded_files:
-        st.subheader(f"📂 Processing: {file.name}")
+uploaded_files = st.file_uploader("Upload Bank or UPI PDF statements", type=["pdf"], accept_multiple_files=True)
 
-        # Read PDF normally
-        file_bytes = file.read()
-        with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-            text = "\n".join(page.get_text() for page in doc)
+def categorize_transaction(Description: str) -> str:
+    """
+    Categorizes a transaction using a hierarchical, multi-layered logic to ensure accuracy.
+    """
+    desc_lower = str(Description or "").lower().strip()
 
-        # OCR fallback if text is too short or missing
-        if len(text.strip()) < 50:
-            st.warning(f"⚠ {file.name} seems scanned. Using OCR...")
-            text = extract_text_with_ocr(file_bytes)
-
-        # --- Always parse after text is ready ---
-        pdf_type = detect_pdf_type(text)
-        st.info(f"Detected Type: *{pdf_type}*")
-
-        if pdf_type == "UPI":
-            df = parse_upi_text(text)
-        elif pdf_type == "BANK":
-            df = parse_bank_text(text)
-        else:
-            st.warning("❌ Unknown format. Skipping this file.")
-            continue
-
-        df["Source File"] = file.name
-        all_dfs.append(df)
-
-        st.success(f"✅ Extracted {len(df)} transactions from {file.name}")
-        st.dataframe(df)
-
-    # Combine all parsed data
-    if all_dfs:
-        combined_df = pd.concat(all_dfs, ignore_index=True)
-
-        if "Source File" not in combined_df.columns:
-            combined_df["Source File"] = "Unknown"
-
-
-        # Ensure required columns exist
-        for col in ["Description", "Category", "Classification"]:
-            if col not in combined_df.columns:
-                combined_df[col] = None
-
-        # --- Ensure Credit & Debit columns ---
-        if "Credit" not in combined_df.columns:
-            combined_df["Credit"] = 0.0
-        if "Debit" not in combined_df.columns:
-            combined_df["Debit"] = 0.0
-
-        # If only Amount column exists, classify into Credit/Debit
-        if "Amount" in combined_df.columns:
-            for i, row in combined_df.iterrows():
-                desc = str(row.get("Description", row.get("Merchant", ""))).lower()
-                amt = row.get("Amount", 0.0)
-
-                if any(word in desc for word in ["received", "credit", "refund", "deposit"]):
-                    combined_df.at[i, "Credit"] = amt
-                    combined_df.at[i, "Debit"] = 0.0
-                elif any(word in desc for word in ["paid", "debit", "sent", "transfer", "purchase", "bill"]):
-                    combined_df.at[i, "Debit"] = amt
-                    combined_df.at[i, "Credit"] = 0.0
-                else:
-                    combined_df.at[i, "Debit"] = amt
-                    combined_df.at[i, "Credit"] = 0.0
-        # Remove failed/pending/cancelled/reversed transactions
-        if "Status" in combined_df.columns:
-            combined_df = combined_df[~combined_df["Status"].str.lower().isin(
-                ["failed", "pending", "cancelled", "reversed"]
-            )]
-
-        # Append to final_df
-        st.session_state.final_df = pd.concat(
-            [st.session_state.final_df, combined_df],
-            ignore_index=True
-        )
-
-        st.session_state.final_df["Category"] = st.session_state.final_df["Description"].apply(categorize_transaction)
-
-        # AI fallback for Miscellaneous
-        misc_mask = st.session_state.final_df["Category"] == "Miscellaneous"
-        if misc_mask.any():
-            misc_descs = st.session_state.final_df.loc[misc_mask, "Description"].tolist()
-            ai_results = categorize_transactions_batch(misc_descs)  # your existing AI batch categorizer
-
-            for idx, res in zip(st.session_state.final_df.loc[misc_mask].index, ai_results):
-                st.session_state.final_df.at[idx, "Category"] = res.get("Category", "Miscellaneous")
-                st.session_state.final_df.at[idx, "Classification"] = res.get("Classification", "Want")
-
-    
-
-# ---- Batch AI Categorization ----
-    def batch_categorize_with_chunks(descriptions, chunk_size=30):
-        results = []
-        for i in range(0, len(descriptions), chunk_size):
-            chunk = descriptions[i:i+chunk_size]
-            results.extend(categorize_transactions_batch(chunk))
-        return results
-
-    with st.spinner("🔍 Auto-categorizing uncategorized transactions using AI..."):
-        mask = (
-            st.session_state.final_df["Source File"] != "Manual Entry"
-        ) & (
-            st.session_state.final_df["Category"].isna() |
-            (st.session_state.final_df["Category"].str.strip() == "") |
-            (st.session_state.final_df["Category"].str.lower() == "uncategorized") |
-            st.session_state.final_df["Classification"].isna()
-        )
-
-        if mask.any():
-            if "Description" not in st.session_state.final_df.columns:
-                st.session_state.final_df["Description"] = ""
-
-            batch_data = (
-                st.session_state.final_df.loc[mask, "Description"]
-                .fillna("")
-                .astype(str)
-                .tolist()
-            )
-
-            results = batch_categorize_with_chunks(batch_data, chunk_size=30)
-            mask_indexes = list(st.session_state.final_df.loc[mask].index)
-
-            if len(results) == len(mask_indexes):
-                for idx, res in zip(mask_indexes, results):
-                    st.session_state.final_df.at[idx, "Category"] = res.get("Category", "Miscellaneous")
-                    st.session_state.final_df.at[idx, "Classification"] = res.get("Classification", "Need")
-            else:
-                st.warning("⚠ Mismatch between AI results and rows — uncategorized rows kept as Miscellaneous.")
-
-            # Fill remaining NaNs
-            st.session_state.final_df["Category"] = st.session_state.final_df["Category"].fillna("Miscellaneous")
-            st.session_state.final_df["Classification"] = st.session_state.final_df["Classification"].fillna("Need")
-
-
-        st.session_state.final_df.to_csv("all_combined_transactions.csv", index=False)
-        st.session_state.pdfs_parsed = True
-
-# --- Show current transactions ---
-if not st.session_state.final_df.empty:
-    st.subheader("📊 Current Transactions")
-    st.dataframe(st.session_state.final_df)
-
-# --- Manual Entry ---
-st.markdown("---")
-st.subheader("➕ Add a Manual Transaction")
-
-categories = {
-    "Food & Dining": "Want",
-    "Groceries": "Need",
-    "Transport": "Need",
-    "Shopping": "Want",
-    "Subscriptions": "Want",
-    "Utilities": "Need",
-    "Rent": "Need",
-    "Entertainment": "Want",
-    "Medical": "Need",
-    "Miscellaneous": "Want"
-}
-
-with st.form("manual_transaction_form", clear_on_submit=True):
-    manual_date = st.date_input("Date of Transaction")
-    manual_desc = st.text_input("Description (e.g., Plumber, Movie Tickets)")
-    manual_amt = st.number_input("Amount (₹)", min_value=0.01, step=0.01)
-    manual_cat = st.selectbox("Category", list(categories.keys()))
-    submitted = st.form_submit_button("➕ Add Transaction")
-
-if submitted:
-    manual_row = {
-        "Date": manual_date.strftime("%d-%m-%Y"),
-        "Time": "",
-        "Merchant": manual_desc,
-        "Amount": manual_amt,
-        "Status": "Success",
-        "Transaction ID": "MANUAL",
-        "UPI ID": "N/A",
-        "Note": "Manual Entry",
-        "Credit": 0.0,
-        "Debit": manual_amt,
-        "Balance": None,
-        "Description": manual_desc,
-        "Category": manual_cat,
-        "Classification": categories[manual_cat],
-        "Source File": "Manual Entry"
+    # Tier 1: High-Confidence Brands & Services (Unambiguous)
+    HIGH_CONFIDENCE = {
+        "Food & Dining": ["swiggy", "zomato", "dominos", "kfc", "mcdonald's", "pizzahut"],
+        "Groceries": ["jiomart", "blinkit", "zepto", "bigbasket"],
+        "Transport": ["uber", "ola", "rapido", "metro"],
+        "Shopping": ["amazon", "flipkart", "myntra", "ajio", "meesho"],
+        "Entertainment": ["netflix", "spotify", "hotstar", "prime video", "bookmyshow", "pvr", "inox"],
+        "Investments": ["zerodha", "groww", "upstox", "wintwealth"],
+        "Utilities": ["vodafone", "airtel", "jio", "recharge"]
     }
 
-    manual_df = pd.DataFrame([manual_row])
-    st.session_state.final_df = pd.concat(
-        [manual_df, st.session_state.final_df],
-        ignore_index=True
-    )
+    # Tier 2: High-Confidence Business Types (Strong Indicators)
+    BUSINESS_TYPES = {
+        "Groceries": ["grocery", "karyana", "supermarket", "hypermarket", "alu shop"],
+        "Health": ["pharmacy", "drug store", "medicose", "medical", "medicals", "hospital", "clinic", "chemist"],
+        "Food & Dining": ["restaurant", "cafe", "sweets", "confectionery", "bakery", "eatery", "tiffin", "tiffin center", "stall", "hotel"],
+        "Shopping": ["fashions", "handloom", "emporium", "gift", "variety store", "book store", "puja bhandar", "samagri"],
+        "Transport": ["petrol", "fuel", "h p center", "filling station"],
+        "Education": ["school", "college", "tuition", "udemy", "coursera"],
+        "Utilities": ["electrical", "net for you", "communication"],
+        "Rent": ["rent"]
+    }
 
-    st.success("✅ Manual transaction added!")
-    st.session_state.final_df.to_csv("all_combined_transactions.csv", index=False)
+    # --- Categorization Logic ---
 
+    # 1. Check High-Confidence Brands first for a quick and accurate match.
+    for category, keywords in HIGH_CONFIDENCE.items():
+        if any(keyword in desc_lower for keyword in keywords):
+            return category
 
-if not st.session_state.final_df.empty:
-    st.markdown("---")
-    st.subheader("📊 All Transactions (Updated)")
-    st.dataframe(st.session_state.final_df)
+    # 2. Check for specific business types.
+    for category, keywords in BUSINESS_TYPES.items():
+        if any(keyword in desc_lower for keyword in keywords):
+            return category
+            
+    # 3. Handle Generic Peer-to-Peer or Unclear Business Payments.
+    generic_payment_pattern = r'^(gpay transaction:|paid to)'
+    if re.search(generic_payment_pattern, desc_lower):
+        all_keywords = [kw for sublist in list(HIGH_CONFIDENCE.values()) + list(BUSINESS_TYPES.values()) for kw in sublist]
+        if not any(keyword in desc_lower for keyword in all_keywords):
+            return "Bank & UPI Transfers"
 
-df = st.session_state.final_df.copy()
-# Ensure Date column exists
-if "Date" not in df.columns:
-    df["Date"] = pd.NaT  # Fill with NaT (Not a Time) if missing
+    # 4. Fallback for generic bank terms if no other category fits.
+    BANK_KEYWORDS = ["upi", "imps", "neft", "rtgs", "atm", "withdrawal", "deposit", "bank charge"]
+    if any(word in desc_lower for word in BANK_KEYWORDS):
+        return "Bank & UPI Transfers"
 
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=True)
-# Ensure Credit & Debit columns always exist
-if "Credit" not in df.columns:
-    df["Credit"] = 0.0
-if "Debit" not in df.columns:
-    df["Debit"] = 0.0
+    # 5. If no rules match after all checks, label it for the AI.
+    return "Other"
 
-# If only Amount column exists, split into Credit/Debit
-if "Amount" in df.columns and (df["Credit"].sum() == 0 and df["Debit"].sum() == 0):
-    for i, row in df.iterrows():
-        desc = str(row.get("Description", row.get("Merchant", ""))).lower()
-        amt = row.get("Amount", 0.0)
+def classify_need_or_want(category: str) -> str:
+    """Classifies a category as a 'Need', 'Want', or 'Other'."""
+    needs = [
+        "Food & Dining", "Groceries", "Transport", "Utilities", "Rent",
+        "Medical", "Education", "Health", "Loans", "Bank Charges"
+    ]
+    wants = [
+        "Shopping", "Entertainment", "Subscriptions"
+    ]
+    if category in needs:
+        return "Need"
+    if category in wants:
+        return "Want"
+    # Everything else (like Bank & UPI Transfers, Investments, Interest) is 'Other'.
+    return "Other"
 
-        if any(word in desc for word in ["received", "credit", "refund", "deposit"]):
-            df.at[i, "Credit"] = amt
-            df.at[i, "Debit"] = 0.0
-        elif any(word in desc for word in ["paid", "debit", "sent", "transfer", "purchase", "bill"]):
-            df.at[i, "Debit"] = amt
-            df.at[i, "Credit"] = 0.0
-        else:
-            df.at[i, "Debit"] = amt
-            df.at[i, "Credit"] = 0.0
+if 'transactions_df' not in st.session_state:
+    st.session_state.transactions_df = pd.DataFrame()
 
-if "Status" in df.columns:
-    df = df[df["Status"].str.lower() != "failed"]
-
-# --- Summary Section ---
-st.markdown("---")
-st.header("📊 Summary Overview")
-
-if not df.empty:
-    total_expense = df["Debit"].sum() if "Debit" in df.columns else 0.0
-    avg_daily_expense = df.groupby(df["Date"].dt.date)["Debit"].sum().mean()
-
-    col1, col2 = st.columns(2)
-    col1.metric("💸 Total Expenses", f"₹{total_expense:,.2f}")
-    col2.metric("📆 Avg Daily Spend", f"₹{avg_daily_expense:,.2f}")
-
-    # Top spending category
-    if "Category" in df.columns and not df["Category"].isna().all():
-        category_totals = df.groupby("Category")["Debit"].sum().reset_index()
-        top_category = category_totals.loc[category_totals["Debit"].idxmax()]
-        st.write(f"🏆 Top Spending Category:** {top_category['Category']} (₹{top_category['Debit']:,.2f})")
-
-    # Most expensive transaction
-    if "Description" in df.columns and not df["Debit"].isna().all():
-        max_txn = df.loc[df["Debit"].idxmax()]
-        st.write(f"💎 Most Expensive Transaction:** {max_txn['Description']} - ₹{max_txn['Debit']:,.2f}")
-
-    # Needs vs Wants Ratio
-    if "Classification" in df.columns:
-        needs_spend = df.loc[df["Classification"] == "Need", "Debit"].sum()
-        wants_spend = df.loc[df["Classification"] == "Want", "Debit"].sum()
-        total_spend = needs_spend + wants_spend
-        if total_spend > 0:
-            needs_percent = (needs_spend / total_spend) * 100
-            wants_percent = (wants_spend / total_spend) * 100
-            st.write(f"⚖ Needs vs Wants:** {needs_percent:.1f}% Needs / {wants_percent:.1f}% Wants")
-
-
-# --- Visual Analysis ---
-if not st.session_state.final_df.empty:
-    st.markdown("---")
-    st.header("📊 Visual Analysis")
-
-    # ---- Toggle for Monthly View ----
-    monthly_view = st.toggle("📅 Show Monthly View Only")
-
-    if monthly_view:
-        # Let user pick month/year
-        selected_month = st.selectbox(
-            "Select Month",
-            sorted(df["Date"].dt.to_period("M").dropna().astype(str).unique())
-        )
-        df = df[df["Date"].dt.to_period("M").astype(str) == selected_month]
-
-    # Monthly Spending Trend
-    monthly_spend = df.groupby(df["Date"].dt.to_period("M"))["Debit"].sum().reset_index()
-    monthly_spend["Date"] = monthly_spend["Date"].astype(str)
-    fig_monthly = px.line(monthly_spend, x="Date", y="Debit", markers=True,
-                          title="Monthly Spending Trend",
-                          labels={"Date": "Month", "Debit": "Amount (₹)"},
-                          template="plotly_white")
-    st.plotly_chart(fig_monthly, use_container_width=True)
-
-    # Category-wise Spending
-    category_spend = df.groupby("Category")["Debit"].sum().reset_index()
-    fig_category = px.pie(category_spend, values="Debit", names="Category",
-                          hole=0.4, title="Spending by Category",
-                          color_discrete_sequence=px.colors.qualitative.Set3)
-    fig_category.update_traces(textposition="inside", textinfo="percent+label")
-    st.plotly_chart(fig_category, use_container_width=True)
-
-    # Needs vs Wants
-    needs_wants = df.groupby("Classification")["Debit"].sum().reset_index()
-    fig_needs = px.bar(needs_wants, x="Classification", y="Debit",
-                       color="Classification",
-                       title="Needs vs Wants",
-                       labels={"Debit": "Amount (₹)"},
-                       template="plotly_white")
-    st.plotly_chart(fig_needs, use_container_width=True)
-
-    # Top 10 Expenses
-    top_expenses = df.sort_values(by="Debit", ascending=False).head(10)
-    fig_top10 = px.bar(top_expenses, x="Description", y="Debit",
-                       color="Category",
-                       title="Top 10 Expenses",
-                       labels={"Debit": "Amount (₹)", "Description": "Transaction"},
-                       template="plotly_white")
-    fig_top10.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig_top10, use_container_width=True)
-
-# --- AI Q&A Section (Multi-turn) ---
-from langchain_experimental.agents import create_pandas_dataframe_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
-from dotenv import load_dotenv
-import os
-import time
-
-# Load .env file
-load_dotenv()
-
-st.markdown("---")
-st.header("💬 Ask Project Balance AI")
-
-# Typewriter effect for responses
-def typewriter(text, delay=0.02):
-    placeholder = st.empty()
-    typed = ""
-    for char in text:
-        typed += char
-        placeholder.markdown(typed)
-        time.sleep(delay)
-
-if not st.session_state.final_df.empty:
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        st.error("❌ Google API key not found. Please set it in your .env file.")
-    else:
-        # Initialize conversation history
-        if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
-
-        # Create LLM
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
-            temperature=0.6,
-            convert_system_message_to_human=True
-        )
-        system_message = SystemMessage(
-            content=(
-                "You are Project Balance AI, a friendly personal finance assistant. "
-                "You answer based on the user's transaction data and remember the conversation history. "
-                "Be clear, conversational, and offer helpful insights."
-    )
-)
-
-        # Create agent
-        agent = create_pandas_dataframe_agent(
-            llm,
-            st.session_state.final_df,
-            verbose=False,
-            allow_dangerous_code=True,
-            agent_executor_kwargs={"system_message": system_message}
-        )
-
-
-        # Chat input
-        user_query = st.chat_input("Ask about your spending (e.g., 'Where did I spend the most this month?')")
-
-        # Display previous conversation
-        for role, message in st.session_state.chat_history:
-            with st.chat_message(role):
-                st.markdown(message)
-
-        if user_query:
-            # Show user message
-            st.session_state.chat_history.append(("user", user_query))
-            with st.chat_message("user"):
-                st.markdown(user_query)
-
-            # Get AI response
-            with st.chat_message("assistant"):
-                with st.spinner("🤖 Thinking..."):
+if uploaded_files:
+    if st.button("Process uploaded files"):
+        all_dfs = []
+        for uploaded_file in uploaded_files:
+            with st.spinner(f"Processing {uploaded_file.name}..."):
+                try:
+                    raw_bytes = uploaded_file.read()
+                    doc = fitz.open(stream=raw_bytes, filetype="pdf")
+                    text = "".join(page.get_text() for page in doc)
                     try:
-                        raw_response = agent.run(user_query)
-                        final_response = f"Here's what I found:\n\n{raw_response}"
-                        typewriter(final_response)
-                        st.session_state.chat_history.append(("assistant", final_response))
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                        uploaded_file.seek(0)
+                    except Exception:
+                        pass
+                    pdf_type = detect_pdf_type(text)
+                    df_parsed, detected_type, full_text = parse_pdf(pdf_type, uploaded_file, debug=False)
 
+                    if df_parsed is None or df_parsed.empty:
+                        st.warning(f"No transactions found in {uploaded_file.name} (detected type: {pdf_type}).")
+                    else:
+                        df_parsed['Source'] = uploaded_file.name
+                        all_dfs.append(df_parsed)
+                        st.success(f"Parsed {len(df_parsed)} transactions from {uploaded_file.name} (detected {detected_type}).")
+                except Exception as e:
+                    st.error(f"Failed to parse {uploaded_file.name}: {e}")
+
+        if all_dfs:
+            combined = pd.concat(all_dfs, ignore_index=True)
+            df = clean_transactions_dataframe(combined)
+
+            # Local categorization first
+            st.info("⚙️ Applying local keyword categorization...")
+            text_col = "RawLine" if "RawLine" in df.columns and df["RawLine"].notna().any() else "Description"
+            if text_col not in df.columns:
+                st.warning("⚠️ No suitable text column found for keyword categorization.")
+            else:
+                df["Category"] = df[text_col].astype(str).apply(categorize_transaction)
+            df["Classification"] = df["Category"].apply(classify_need_or_want)
+
+            # AI for only the ambiguous rows
+            ambiguous_mask = df["Category"].isin(["Other", "Miscellaneous"]) | df["Category"].isnull()
+            num_ambiguous = ambiguous_mask.sum()
+            if num_ambiguous > 0:
+                st.info(f"🤖 Sending {num_ambiguous} ambiguous rows to Gemini for AI categorization...")
+                need_ai = df.loc[ambiguous_mask].copy()  # keep original indices
+                ai_result = categorize_transactions_with_ai(need_ai, debug=False)
+                # Update original df using index alignment
+                df.loc[ai_result.index, ["Category", "Classification"]] = ai_result.loc[:, ["Category", "Classification"]].values
+                st.success("✅ AI categorization completed for ambiguous rows.")
+            else:
+                st.success("✅ All transactions categorized locally (no AI calls).")
+
+            df = refine_miscellaneous_transactions(df, debug=True)
+            df = refine_bank_transfers(df, debug=True)
+            st.session_state.transactions_df = df
+            st.success("🎉 All files processed and categorized!")
+            st.rerun()
+
+ 
+# Main UI when data exists
+if not st.session_state.transactions_df.empty:
+    df = st.session_state.transactions_df.copy()
+
+    # Manual entry
+    st.markdown("---")
+    st.subheader("✍️ Add a Manual Transaction")
+
+    with st.form("manual_txn", clear_on_submit=True):
+        date = st.date_input("Date")
+        amt = st.number_input("Amount (expense)", min_value=0.0, value=0.0, step=1.0)
+        category_options = [
+        "Food & Dining", "Groceries", "Transport", "Shopping", "Subscriptions",
+        "Utilities", "Rent", "Entertainment", "Medical", "Education",
+        "Bank & UPI Transfers", "Investments",
+        "Interest/Dividends", "Miscellaneous"
+    ]
+        cat= st.selectbox("Category", category_options)
+        cls = st.selectbox("Classification", ["Need", "Want", "Other"])
+        if st.form_submit_button("Add Transaction"):
+            new_row = {
+                "Date": pd.to_datetime(date),
+                "Debit": float(amt),
+                "Credit": 0.0,
+                "Category": cat,
+                "Classification": cls,
+                "Source": "Manual Entry"
+            }
+            st.session_state.transactions_df = pd.concat(
+                [st.session_state.transactions_df, pd.DataFrame([new_row])],
+                ignore_index=True
+            )
+            st.success("✅ Manual transaction added.")
+            st.rerun()
+
+#---------------------Transactions table--------------------------
+    st.markdown("---")
+    st.subheader("📋 Transactions Table")
+    st.dataframe(df)
+
+#---------------------Snapshot------------------------------------
+    st.markdown("---")
+    st.subheader("📈 Expense Analysis Snapshot")
+    metrics = compute_financial_metrics(df)
+    cols = st.columns(5)
+
+    cols[0].metric(
+        "Total Spent",
+        metrics["Total Expense"]
+    )
+    cols[1].metric(
+        "Spending Period",
+        metrics["Spending Period (Days)"]
+    )
+    cols[2].metric(
+        "Daily Average Spend",
+        metrics["Daily Average Spend"]
+    )
+    cols[3].metric(
+        "No. of Transactions",
+        metrics["Total Transactions"]
+    )
+    # This metric dynamically shows the user's #1 spending category
+    cols[4].metric(
+        f"Top Category: {metrics['Top Category Name']}",
+        metrics["Top Category Value"]
+    )
+
+    # Charts
+    st.markdown("---")
+    st.subheader("📊 Visual Analysis")
+    left, right = st.columns(2)
+    with left:
+        fig1 = plot_expense_by_category(df)
+        if fig1:
+            st.plotly_chart(fig1, use_container_width=True)
+        fig2 = plot_top_expenses(df)
+        if fig2:
+            st.plotly_chart(fig2, use_container_width=True)
+    with right:
+        fig3 = plot_need_vs_want(df)
+        if fig3:
+            st.plotly_chart(fig3, use_container_width=True)
+        fig4 = plot_monthly_trends(df)
+        if fig4:
+            st.plotly_chart(fig4, use_container_width=True)
+
+    # Downloads
+    st.markdown("---")
+    st.subheader("⬇️ Download Data")
+
+    # 1. Download CSV Button (remains the same)
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        "Export All Transactions (CSV)", 
+        csv, 
+        file_name="transactions.csv", 
+        mime="text/csv"
+    )
+
+# 2. Download PDF Report Button (updated logic)
+if st.button("Generate PDF Report"):
+    with st.spinner("🤖 AI Analyst is writing your summary..."):
+        raw_metrics = compute_financial_metrics(df) 
+        metrics_for_ai = {
+            "Total Expense": df['Debit'].sum(),
+            "Total Transactions": len(df)
+        }
+        ai_summary = generate_financial_summary(df, metrics_for_ai)
+        st.session_state.ai_summary = ai_summary
+
+    with st.spinner("🎨 Assembling your report with charts..."):
+        pdf_bytes = create_report(df, raw_metrics, st.session_state.ai_summary)
+        st.session_state.pdf_bytes = pdf_bytes
+        st.success("✅ Your PDF report is ready!")
+
+if 'pdf_bytes' in st.session_state:
+    st.download_button(
+        "Download PDF Report", 
+        st.session_state.pdf_bytes, 
+        file_name="financial_report.pdf", 
+        mime="application/pdf"
+    )
+
+
+#------------------Balance Bot-------------------------
+load_dotenv()
+def answer_query(df, query):
+    """
+    Uses Gemini API to analyze user's transactions and provide concise financial insights.
+    """
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        csv_preview = df.head(10).to_string(index=False)
+
+        prompt = f"""
+        You are a concise and analytical AI financial assistant.
+        The user asked: "{query}"
+
+        Here are their recent transactions (first 10 rows):
+        {csv_preview}
+
+        Provide a short, structured response including:
+        - Total spending (if inferable)
+        - Top 3 spending categories with approximate amounts
+        - A brief Needs vs Wants summary
+        - 1-2 observations for saving opportunities
+
+        Use bullet points or short formatted text.
+        Avoid long paragraphs — prioritize clarity and brevity.
+        """
+
+        response = model.generate_content(prompt)
+        return response.text
+
+    except Exception as e:
+        return f"Error generating response: {e}"
+
+
+# ------------------ Session State Init ------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "transactions_df" not in st.session_state:
+    st.session_state.transactions_df = pd.DataFrame()
+
+# ------------------ Voice Input Function ------------------
+def recognize_speech():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        st.info("🎙️ Listening... Please speak clearly")
+        try:
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=8)
+            st.info("🔍 Processing your voice input...")
+            text = recognizer.recognize_google(audio)
+            st.success(f"You said: {text}")
+            return text
+        except sr.WaitTimeoutError:
+            st.warning("⚠️ Listening timed out. Please try again.")
+        except sr.UnknownValueError:
+            st.warning("⚠️ Sorry, I couldn’t understand your voice.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+    return None
+
+# ------------------ Chat Display ------------------
+st.markdown("## 💬 Chat with Balance Bot")
+
+# Display message history
+for m in st.session_state.messages:
+    role = m.get("role", "")
+    raw_content = m.get("content", "")
+    content = html.escape(str(raw_content)).replace("\n", "<br>")
+
+    if role == "user":
+        st.markdown(
+            f"""
+            <div style="
+                background: linear-gradient(135deg, #BBDEFB 0%, #E3F2FD 100%);
+                padding: 12px 14px;
+                border-radius: 15px;
+                margin: 8px 0;
+                text-align: right;
+                color: #0D47A1;
+                font-weight: 500;
+                font-size: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+                width: fit-content;
+                max-width: 80%;
+                margin-left: auto;
+            ">{content}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    elif role == "assistant":
+        st.markdown(
+            f"""
+            <div style="
+                background: linear-gradient(135deg, #1565C0 0%, #1E88E5 100%);
+                padding: 12px 14px;
+                border-radius: 15px;
+                margin: 8px 0;
+                text-align: left;
+                color: white;
+                font-weight: 500;
+                font-size: 15px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+                width: fit-content;
+                max-width: 80%;
+                margin-right: auto;
+            ">{content}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+st.markdown("---")
+
+# ------------------ Input Section ------------------
+col1, col2 = st.columns([5, 1])
+
+with col1:
+    prompt = st.chat_input("Type your question or use the mic...")
+
+with col2:
+    if st.button("🎤 Speak"):
+        spoken_text = recognize_speech()
+        if spoken_text:
+            prompt = spoken_text 
+
+# ------------------ Handle User Query ------------------
+if prompt:
+    final_prompt = prompt.strip()
+
+    # Add user message to history
+    st.session_state.messages.append({
+        "role": "user",
+        "content": final_prompt,
+        "ts": datetime.utcnow().isoformat()
+    })
+
+    # Generate assistant response
+    df = st.session_state.get("transactions_df")
+    if df is not None and not df.empty:
+        try:
+            assistant_reply = answer_query(df, final_prompt)
+        except Exception as e:
+            assistant_reply = f"Error while answering the query: {e}"
+    else:
+        assistant_reply = "Please upload and process a file first."
+
+    # --- Animated intro bubble ---
+    summary = "Here's your spending summary and insights 💰👇"
+    message_placeholder = st.empty()
+    typed_text = ""
+    for char in summary:
+        typed_text += char
+        message_placeholder.markdown(
+            f"""
+            <div style="
+                background: linear-gradient(135deg, #BBDEFB 0%, #E3F2FD 100%);
+                padding: 12px;
+                border-radius: 12px;
+                margin: 8px 0;
+                text-align: left;
+                color: #0D47A1;
+                font-weight: 600;
+                font-size: 16px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            ">{typed_text}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        time.sleep(0.006)  # faster animation speed
+
+    # --- Detailed report below in collapsible expander ---
+    with st.expander("📊 View Detailed Breakdown", expanded=True):
+        st.markdown(
+            f"""
+            <div style="
+                background-color: #E3F2FD;
+                padding: 15px;
+                border-radius: 10px;
+                margin-top: 8px;
+                text-align: left;
+                color: #0D47A1;
+                font-size: 15px;
+                line-height: 1.6;
+            ">{assistant_reply}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # Save assistant message in history
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": assistant_reply,
+        "ts": datetime.utcnow().isoformat()
+    })
+
+    st.rerun()
